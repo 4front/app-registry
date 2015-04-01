@@ -5,7 +5,8 @@ var debug = require('debug')('4front:app-registry');
 module.exports = function(options) {
   _.defaults(options || {}, {
     cacheTtl: 5 * 60,
-    cachePrefix: 'app_'
+    cachePrefix: 'app_',
+    useCustomDomains: true
   });
 
   var exports = {};
@@ -97,7 +98,7 @@ module.exports = function(options) {
 
       if (!domain) {
         debug("domain %s not found", domainName);
-        return callback(null);
+        return callback(null, null);
       }
 
       exports.getById(domain.appId, opts, callback);
@@ -138,15 +139,8 @@ module.exports = function(options) {
     if (!app.authConfig)
       app.authConfig = {type: 'public'};
 
-    // if (_.isArray(app.domains) && app.domains.length > 0) {
-    //   app.domain = app.domains[0];
-    // }
-    // else if (_.isString(app.domain)) {
-    //   app.domains = [app.domain];
-    // }
-
     var appUrl = (app.requireSsl === true) ? 'https://' : 'http://';
-    if (_.isArray(app.domains) && app.domains.length && process.env.NODE_ENV == 'production')
+    if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length)
       appUrl += app.domains[0];
     else
       appUrl += (app.name + '.' + options.appHost);
