@@ -1,6 +1,6 @@
 var _ = require('lodash');
 var async = require('async');
-var debug = require('debug')('4front:app-registry');
+var debug = require('debug')('4front-app-registry');
 
 module.exports = function(options) {
   _.defaults(options || {}, {
@@ -31,6 +31,21 @@ module.exports = function(options) {
       }
 
       fetchFromDatabase(appId, callback);
+    });
+  };
+
+  exports.batchGetById = function(appIds, opts, callback) {
+    if (_.isFunction(opts)) {
+      callback = opts;
+      opts = {};
+    }
+
+    async.map(appIds, function(appId, cb) {
+      exports.getById(appId, opts, cb);
+    }, function(err, apps) {
+      if (err) return callback(err);
+
+      callback(null, _.compact(apps));
     });
   };
 
@@ -68,21 +83,6 @@ module.exports = function(options) {
   exports.flushApp = function(app) {
     options.cache.del(options.cachePrefix + app.appId);
     options.cache.del(options.cachePrefix + 'name_' + app.name);
-  };
-
-  exports.batchGetApps = function(appIds, opts, callback) {
-    if (_.isFunction(opts)) {
-      callback = opts;
-      opts = {};
-    }
-
-    async.map(appIds, function(appId, cb) {
-      exports.getById(appId, opts, cb);
-    }, function(err, apps) {
-      if (err) return callback(err);
-
-      callback(null, _.compact(apps));
-    });
   };
 
   exports.getByDomain = function(domainName, opts, callback) {

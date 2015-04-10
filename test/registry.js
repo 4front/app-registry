@@ -132,12 +132,12 @@ describe('appRegistry', function() {
     });
   });
 
-  describe('batchGetApps', function() {
+  describe('batchGetById()', function() {
     it('some in cache, some not', function(done) {
       this.database.apps.push({appId: '1', name:'app1'});
       this.addToCache({appId: '2', name:'app2'});
 
-      this.registry.batchGetApps(['1', '2', '3'], function(err, apps) {
+      this.registry.batchGetById(['1', '2', '3'], function(err, apps) {
         assert.equal(apps.length, 2);
         assert.ok(self.options.database.getApplication.calledWith('1'));
         assert.ok(self.options.database.getApplication.calledWith('3'));
