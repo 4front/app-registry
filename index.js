@@ -139,6 +139,10 @@ module.exports = function(options) {
     if (!app.authConfig)
       app.authConfig = {type: 'public'};
 
+    // Temporary hack until personal apps are deprecated.
+    if (!app.orgId)
+      app.environments = ['production'];
+
     var appUrl = (app.requireSsl === true) ? 'https://' : 'http://';
     if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length)
       appUrl += app.domains[0];
