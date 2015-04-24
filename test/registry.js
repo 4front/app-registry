@@ -32,8 +32,8 @@ describe('appRegistry', function() {
         getApplication: sinon.spy(function(appId, callback) {
           callback(null, _.find(self.database.apps, {appId: appId}));
         }),
-        findApplication: sinon.spy(function(criteria, callback) {
-          callback(null, _.find(self.database.apps, {name: criteria.name}));
+        getApplicationByName: sinon.spy(function(name, callback) {
+          callback(null, _.find(self.database.apps, {name: name}));
         }),
         getDomain: sinon.spy(function(domain, callback) {
           callback(null, _.find(self.database.domains, {domain: domain}));
@@ -123,7 +123,7 @@ describe('appRegistry', function() {
 
       this.registry.getByName(appName, function(err, app) {
         assert.ok(self.options.cache.get.calledWith('app_name_' + appName));
-        assert.ok(self.options.database.findApplication.calledWith({name: appName}));
+        assert.ok(self.options.database.getApplicationByName.calledWith(appName));
         assert.ok(self.options.cache.setex.calledWith('app_name_' + appName));
         assert.ok(self.options.cache.setex.calledWith('app_' + appId));
 

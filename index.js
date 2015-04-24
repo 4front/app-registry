@@ -65,7 +65,7 @@ module.exports = function(options) {
         return exports.getById(appId, opts, callback);
 
       // If we didn't find the appName in cache, lookup the app by id.
-      options.database.findApplication({name: name}, function(err, app) {
+      options.database.getApplicationByName(name, function(err, app) {
         if (err) return callback(err);
 
         if (app) {
