@@ -3,7 +3,7 @@ var async = require('async');
 var debug = require('debug')('4front-app-registry');
 
 module.exports = function(options) {
-  _.defaults(options || {}, {
+  options = _.defaults(options || {}, {
     cacheTtl: 5 * 60,
     cachePrefix: 'app_',
     useCustomDomains: true
