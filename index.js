@@ -105,6 +105,13 @@ module.exports = function(options) {
     });
   };
 
+  // Add the specified app to the registry.
+  exports.add = function(app) {
+    fixUpApp(app);
+    addToCache(app);
+    return app;
+  };
+
   function addToCache(app) {
     debug("writing app %s to cache", app.appId);
     options.cache.setex(options.cachePrefix + app.appId, app, options.cacheTtl);

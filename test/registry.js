@@ -166,6 +166,16 @@ describe('appRegistry', function() {
     });
   });
 
+  it('add to registry', function() {
+    var app = {
+      appId: '1',
+      name: 'test'
+    };
+
+    this.registry.add(app);
+    assert.equal(app.url, 'http://test.apphost.com');
+  });
+
   describe('fixUpApp', function() {
     it('sets http app url', function(done) {
       this.addToCache({appId: '1', name: 'app'});
