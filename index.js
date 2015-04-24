@@ -154,7 +154,7 @@ module.exports = function(options) {
     if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length)
       appUrl += app.domains[0];
     else
-      appUrl += (app.name + '.' + options.appHost);
+      appUrl += (app.name + '.' + options.virtualHost);
 
     app.url = appUrl;
 

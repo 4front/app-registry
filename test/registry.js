@@ -16,7 +16,7 @@ describe('appRegistry', function() {
     };
 
     this.options = {
-      appHost: 'apphost.com',
+      virtualHost: 'apphost.com',
       cache: {
         get: sinon.spy(function(key, callback) {
           callback(null, self.cache[key]);
