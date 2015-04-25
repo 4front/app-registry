@@ -1,6 +1,6 @@
 var _ = require('lodash');
 var async = require('async');
-var debug = require('debug')('4front-app-registry');
+var debug = require('debug')('4front:app-registry');
 
 module.exports = function(options) {
   options = _.defaults(options || {}, {
@@ -40,6 +40,7 @@ module.exports = function(options) {
       opts = {};
     }
 
+    debug("batch get apps %o", appIds);
     async.map(appIds, function(appId, cb) {
       exports.getById(appId, opts, cb);
     }, function(err, apps) {
@@ -114,8 +115,8 @@ module.exports = function(options) {
 
   function addToCache(app) {
     debug("writing app %s to cache", app.appId);
-    options.cache.setex(options.cachePrefix + app.appId, app, options.cacheTtl);
-    options.cache.setex(options.cachePrefix + 'name_' + app.name, app.appId, options.cacheTtl);
+    options.cache.setex(options.cachePrefix + app.appId, options.cacheTtl, app);
+    options.cache.setex(options.cachePrefix + 'name_' + app.name, options.cacheTtl, app.appId);
   };
 
   function fetchFromDatabase(appId, callback) {
@@ -162,6 +163,9 @@ module.exports = function(options) {
   }
 
   function fixConfigSettings(app) {
+    if (_.isObject(app.configSettings) === false)
+      return;
+
     // TODO: Temporary get configSettings back in the correct format.
     if (app.configSettings._default) {
       var configSettings = [];
