@@ -44,7 +44,7 @@ describe('appRegistry', function() {
     this.registry = appRegistry(this.options);
 
     this.addToCache = function(app) {
-      self.options.cache.setex('app_' + app.appId, app);
+      self.options.cache.setex('app_' + app.appId, JSON.stringify(app));
       self.options.cache.setex('app_name_' + app.name, app.appId);
     };
   });
@@ -55,6 +55,8 @@ describe('appRegistry', function() {
       this.addToCache({appId: appId, name: 'appname'});
 
       this.registry.getById(appId, function(err, app) {
+        if (err) return done(err);
+
         assert.ok(self.options.cache.get.calledWith('app_' + appId));
         assert.equal(appId, app.appId);
         done();
@@ -67,6 +69,8 @@ describe('appRegistry', function() {
       this.database.apps.push({appId: appId, name: appName});
 
       this.registry.getById(appId, function(err, app) {
+        if (err) return done(err);
+        
         assert.ok(self.options.cache.get.calledWith('app_' + appId));
         assert.ok(self.options.database.getApplication.calledWith(appId));
         assert.ok(self.options.cache.setex.calledWith('app_' + appId));

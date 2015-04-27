@@ -24,10 +24,21 @@ module.exports = function(options) {
       return fetchFromDatabase(appId, callback);
 
     debug("looking up app %s in cache", appId);
-    options.cache.get(appCacheKey, function(err, app) {
-      if (app) {
-        fixUpApp(app);
-        return callback(null, app);
+    options.cache.get(appCacheKey, function(err, appJson) {
+      if (err) return callback(err);
+
+      var app;
+      if (appJson) {
+        try {
+          app = JSON.parse(appJson);
+        }
+        catch (jsonErr) {
+        }
+
+        if (app) {
+          fixUpApp(app);
+          return callback(null, app);
+        }
       }
 
       fetchFromDatabase(appId, callback);
@@ -115,7 +126,7 @@ module.exports = function(options) {
 
   function addToCache(app) {
     debug("writing app %s to cache", app.appId);
-    options.cache.setex(options.cachePrefix + app.appId, options.cacheTtl, app);
+    options.cache.setex(options.cachePrefix + app.appId, options.cacheTtl, JSON.stringify(app));
     options.cache.setex(options.cachePrefix + 'name_' + app.name, options.cacheTtl, app.appId);
   };
 
