@@ -3,10 +3,11 @@ var async = require('async');
 var debug = require('debug')('4front:app-registry');
 
 module.exports = function(options) {
-  options = _.defaults(options || {}, {
+  options = _.defaults({}, options || {}, {
     cacheTtl: 5 * 60,
     cachePrefix: 'app_',
-    useCustomDomains: true
+    useCustomDomains: true,
+    cacheEnabled: process.env['FF_APP_CACHE_ENABLED'] === '1'
   });
 
   var exports = {};
@@ -18,12 +19,12 @@ module.exports = function(options) {
       opts = {};
     }
 
-    var appCacheKey = options.cachePrefix + appId;
-
-    if (opts.forceReload === true)
+    if (opts.forceReload === true || options.cacheEnabled !== true)
       return fetchFromDatabase(appId, callback);
 
     debug("looking up app %s in cache", appId);
+    var appCacheKey = options.cachePrefix + appId;
+
     options.cache.get(appCacheKey, function(err, appJson) {
       if (err) return callback(err);
 
@@ -69,26 +70,39 @@ module.exports = function(options) {
     }
 
     debug("looking up app with name: %s", name);
-    // Lookup the app name in cache.
-    options.cache.get(options.cachePrefix + 'name_' + name, function(err, appId) {
-      if (err) return callback(err);
-
-      if (appId)
-        return exports.getById(appId, opts, callback);
-
-      // If we didn't find the appName in cache, lookup the app by id.
+    if (opts.forceReload === true || options.cacheEnabled !== true) {
       options.database.getApplicationByName(name, function(err, app) {
         if (err) return callback(err);
 
-        if (app) {
-          debug("found app in database with name: %s", name);
-          addToCache(app);
-          fixUpApp(app);
-        }
-
+        fixUpApp(app);
         callback(null, app);
       });
-    });
+    }
+    else {
+      // Lookup the app name in cache.
+      options.cache.get(options.cachePrefix + 'name_' + name, function(err, appId) {
+        if (err) return callback(err);
+
+        if (appId)
+          return exports.getById(appId, opts, callback);
+
+        // If we didn't find the appName in cache, lookup the app by id.
+        options.database.getApplicationByName(name, function(err, app) {
+          if (err) return callback(err);
+
+          if (app) {
+            debug("found app in database with name: %s", name);
+
+            if (options.cacheEnabled === true)
+              addToCache(app);
+
+            fixUpApp(app);
+          }
+
+          callback(null, app);
+        });
+      });
+    }
   };
 
   // Flush app from the registry forcing it to reload from the database next time get is called.
@@ -142,7 +156,8 @@ module.exports = function(options) {
       debug("found application %s in database", appId);
 
       // Store a mapping of appName to appId in cache
-      addToCache(app);
+      if (options.cacheEnabled === true)
+        addToCache(app);
 
       fixUpApp(app);
       callback(null, app);
@@ -153,10 +168,6 @@ module.exports = function(options) {
     // TODO: Delete this when ready
     if (!app.trafficControlRules)
       app.trafficControlRules = [];
-    if (!app.configSettings)
-      app.configSettings = [];
-    if (!app.authConfig)
-      app.authConfig = {type: 'public'};
 
     // Temporary hack until personal apps are deprecated.
     if (!app.orgId)
@@ -169,27 +180,6 @@ module.exports = function(options) {
       appUrl += (app.name + '.' + options.virtualHost);
 
     app.url = appUrl;
-
-    fixConfigSettings(app);
-  }
-
-  function fixConfigSettings(app) {
-    if (_.isObject(app.configSettings) === false)
-      return;
-
-    // TODO: Temporary get configSettings back in the correct format.
-    if (app.configSettings._default) {
-      var configSettings = [];
-      _.each(app.configSettings._default, function(value, key) {
-        configSettings.push({
-          key: key,
-          value: value.value,
-          serverOnly: !value.sendToClient
-        });
-      });
-
-      app.configSettings = configSettings;
-    }
   }
 
   return exports;

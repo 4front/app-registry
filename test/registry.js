@@ -3,6 +3,8 @@ var assert = require('assert');
 var _ = require('lodash');
 var sinon = require('sinon');
 
+require('dash-assert');
+
 describe('appRegistry', function() {
   var self;
 
@@ -16,6 +18,7 @@ describe('appRegistry', function() {
     };
 
     this.options = {
+      cacheEnabled: true,
       virtualHost: 'apphost.com',
       cache: {
         get: sinon.spy(function(key, callback) {
@@ -70,7 +73,7 @@ describe('appRegistry', function() {
 
       this.registry.getById(appId, function(err, app) {
         if (err) return done(err);
-        
+
         assert.ok(self.options.cache.get.calledWith('app_' + appId));
         assert.ok(self.options.database.getApplication.calledWith(appId));
         assert.ok(self.options.cache.setex.calledWith('app_' + appId));
@@ -206,6 +209,44 @@ describe('appRegistry', function() {
         assert.equal(app.url, 'https://www.app.com');
         done();
       })
+    });
+  });
+
+  describe('disable cache', function() {
+    beforeEach(function() {
+      self = this;
+
+      this.registry = appRegistry(_.extend(this.options, {
+        cacheEnabled: false
+      }));
+
+      this.appId = '123';
+      this.appName = 'appname';
+      this.database.apps.push({appId: this.appId, name: this.appName});
+    });
+
+    it('getById', function(done) {
+      this.registry.getById(this.appId, function(err, app) {
+        if (err) return done(err);
+
+        assert.isFalse(self.options.cache.get.called);
+        assert.isFalse(self.options.cache.setex.called);
+        assert.isTrue(self.options.database.getApplication.calledWith(self.appId));
+
+        done();
+      });
+    });
+
+    it('getByName', function(done) {
+      this.registry.getByName(this.appName, function(err, app) {
+        if (err) return done(err);
+
+        assert.isFalse(self.options.cache.get.called);
+        assert.isFalse(self.options.cache.setex.called);
+        assert.isTrue(self.options.database.getApplicationByName.calledWith(self.appName));
+
+        done();
+      });
     });
   });
 });
