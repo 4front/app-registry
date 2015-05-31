@@ -237,6 +237,15 @@ describe('appRegistry', function() {
       });
     });
 
+    it('getById missing', function(done) {
+      this.registry.getById('xyz', function(err, app) {
+        if (err) return done(err);
+
+        assert.isNull(app);
+        done();
+      });
+    });
+
     it('getByName', function(done) {
       this.registry.getByName(this.appName, function(err, app) {
         if (err) return done(err);
@@ -245,6 +254,15 @@ describe('appRegistry', function() {
         assert.isFalse(self.options.cache.setex.called);
         assert.isTrue(self.options.database.getApplicationByName.calledWith(self.appName));
 
+        done();
+      });
+    });
+
+    it('getByName missing', function(done) {
+      this.registry.getByName('missing-name', function(err, app) {
+        if (err) return done(err);
+
+        assert.isNull(app);
         done();
       });
     });

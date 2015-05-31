@@ -74,6 +74,9 @@ module.exports = function(options) {
       options.database.getApplicationByName(name, function(err, app) {
         if (err) return callback(err);
 
+        if (!app)
+          return callback(null, null);
+
         fixUpApp(app);
         callback(null, app);
       });
