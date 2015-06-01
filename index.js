@@ -177,6 +177,10 @@ module.exports = function(options) {
       app.environments = ['production'];
 
     var appUrl = (app.requireSsl === true) ? 'https://' : 'http://';
+
+    if (!app.domains)
+      app.domains = [];
+
     if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length)
       appUrl += app.domains[0];
     else
