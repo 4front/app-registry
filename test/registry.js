@@ -202,6 +202,22 @@ describe('appRegistry', function() {
       })
     });
 
+    it('global ssl setting overrides app level setting', function(done) {
+      this.registry = appRegistry(_.extend(this.options, {
+        forceGlobalHttps: true
+      }));
+
+      var appId = '123';
+      this.addToCache({appId: appId, requireSsl: false});
+
+      this.registry.getById(appId, function(err, app) {
+        assert.isTrue(app.requireSsl);
+        assert.isTrue(/^https\:/.test(app.url));
+
+        done();
+      });
+    });
+
     it('sets custom domain app url', function(done) {
       this.addToCache({appId: '1', name: 'app', domains: ['www.app.com'], requireSsl: true});
 

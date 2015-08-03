@@ -7,6 +7,7 @@ module.exports = function(options) {
     cacheTtl: 5 * 60,
     cachePrefix: 'app_',
     useCustomDomains: true,
+    forceGlobalHttps: false,
     cacheEnabled: process.env['FF_APP_CACHE_ENABLED'] === '1'
   });
 
@@ -175,6 +176,11 @@ module.exports = function(options) {
     // Temporary hack until personal apps are deprecated.
     if (!app.orgId)
       app.environments = ['production'];
+
+    // If the 4front environment specifies everything must be https, override
+    // the app.requireSsl to true.
+    if (options.forceGlobalHttps === true)
+      app.requireSsl = true;
 
     var appUrl = (app.requireSsl === true) ? 'https://' : 'http://';
 
