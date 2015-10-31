@@ -8,7 +8,7 @@ module.exports = function(options) {
     cachePrefix: 'app_',
     useCustomDomains: true,
     forceGlobalHttps: false,
-    cacheEnabled: process.env['FF_APP_CACHE_ENABLED'] === '1'
+    cacheEnabled: process.env.FF_APP_CACHE_ENABLED === '1'
   });
 
   var exports = {};
@@ -20,10 +20,11 @@ module.exports = function(options) {
       opts = {};
     }
 
-    if (opts.forceReload === true || options.cacheEnabled !== true)
+    if (opts.forceReload === true || options.cacheEnabled !== true) {
       return fetchFromDatabase(appId, callback);
+    }
 
-    debug("looking up app %s in cache", appId);
+    debug('looking up app %s in cache', appId);
     var appCacheKey = options.cachePrefix + appId;
 
     options.cache.get(appCacheKey, function(err, appJson) {
@@ -33,8 +34,8 @@ module.exports = function(options) {
       if (appJson) {
         try {
           app = JSON.parse(appJson);
-        }
-        catch (jsonErr) {
+        } catch (jsonErr) {
+          debug('cache object invalid', appCacheKey);
         }
 
         if (app) {
@@ -53,7 +54,7 @@ module.exports = function(options) {
       opts = {};
     }
 
-    debug("batch get apps %o", appIds);
+    debug('batch get apps %o', appIds);
     async.map(appIds, function(appId, cb) {
       exports.getById(appId, opts, cb);
     }, function(err, apps) {
@@ -70,35 +71,31 @@ module.exports = function(options) {
       opts = {};
     }
 
-    debug("looking up app with name: %s", name);
+    debug('looking up app with name: %s', name);
     if (opts.forceReload === true || options.cacheEnabled !== true) {
       options.database.getApplicationByName(name, function(err, app) {
         if (err) return callback(err);
 
-        if (!app)
-          return callback(null, null);
+        if (!app) return callback(null, null);
 
         fixUpApp(app);
         callback(null, app);
       });
-    }
-    else {
+    } else {
       // Lookup the app name in cache.
       options.cache.get(options.cachePrefix + 'name_' + name, function(err, appId) {
         if (err) return callback(err);
 
-        if (appId)
-          return exports.getById(appId, opts, callback);
+        if (appId) return exports.getById(appId, opts, callback);
 
         // If we didn't find the appName in cache, lookup the app by id.
-        options.database.getApplicationByName(name, function(err, app) {
-          if (err) return callback(err);
+        options.database.getApplicationByName(name, function(_err, app) {
+          if (_err) return callback(_err);
 
           if (app) {
-            debug("found app in database with name: %s", name);
+            debug('found app in database with name: %s', name);
 
-            if (options.cacheEnabled === true)
-              addToCache(app);
+            if (options.cacheEnabled === true) addToCache(app);
 
             fixUpApp(app);
           }
@@ -121,13 +118,12 @@ module.exports = function(options) {
       opts = {};
     }
 
-    debug("get domain %s", domainName);
+    debug('get domain %s', domainName);
     options.database.getDomain(domainName, function(err, domain) {
-      if (err)
-        return callback(err);
+      if (err) return callback(err);
 
       if (!domain) {
-        debug("domain %s not found", domainName);
+        debug('domain %s not found', domainName);
         return callback(null, null);
       }
 
@@ -143,56 +139,58 @@ module.exports = function(options) {
   };
 
   function addToCache(app) {
-    debug("writing app %s to cache", app.appId);
+    debug('writing app %s to cache', app.appId);
     options.cache.setex(options.cachePrefix + app.appId, options.cacheTtl, JSON.stringify(app));
     options.cache.setex(options.cachePrefix + 'name_' + app.name, options.cacheTtl, app.appId);
-  };
+  }
 
   function fetchFromDatabase(appId, callback) {
     options.database.getApplication(appId, function(err, app) {
-      if (err)
-        return callback(err);
+      if (err) return callback(err);
 
       if (!app) {
-        debug("cannot find app %s in database", appId);
+        debug('cannot find app %s in database', appId);
         return callback(null, null);
       }
-      debug("found application %s in database", appId);
+      debug('found application %s in database', appId);
 
       // Store a mapping of appName to appId in cache
-      if (options.cacheEnabled === true)
-        addToCache(app);
+      if (options.cacheEnabled === true) addToCache(app);
 
       fixUpApp(app);
       callback(null, app);
     });
-  };
+  }
 
   function fixUpApp(app) {
     // TODO: Delete this when ready
-    if (!app.trafficControlRules)
-      app.trafficControlRules = [];
+    if (!app.trafficControlRules) app.trafficControlRules = [];
 
     // Temporary hack until personal apps are deprecated.
-    if (!app.orgId)
-      app.environments = ['production'];
+    if (!app.orgId) app.environments = ['production'];
 
     // If the 4front environment specifies everything must be https, override
     // the app.requireSsl to true.
-    if (options.forceGlobalHttps === true)
-      app.requireSsl = true;
+    if (!app.domains) app.domains = [];
 
-    var appUrl = (app.requireSsl === true) ? 'https://' : 'http://';
+    var useHttps;
+    var hostname;
 
-    if (!app.domains)
-      app.domains = [];
+    if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length) {
+      // Find the first custom domain with a 'resolve' action.
+      var domainToResolveTo = _.find(app.domains, {action: 'resolve'});
+      // debugger;
+      if (domainToResolveTo) {
+        useHttps = domainToResolveTo.certificate || false;
+        hostname = domainToResolveTo.domain;
+      }
+    }
+    if (!hostname) {
+      useHttps = options.forceGlobalHttps;
+      hostname = app.name + '.' + options.virtualHost;
+    }
 
-    if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length)
-      appUrl += app.domains[0];
-    else
-      appUrl += (app.name + '.' + options.virtualHost);
-
-    app.url = appUrl;
+    app.url = (useHttps ? 'https://' : 'http://') + hostname;
   }
 
   return exports;

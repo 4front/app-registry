@@ -16,12 +16,7 @@
     "type": "git",
     "url": "https://github.com/4front/app-registry"
   },
-  "licenses": [
-    {
-      "type": "Apache-2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-    }
-  ],
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/4front/apphost/issues"
   },
@@ -34,6 +29,8 @@
   },
   "devDependencies": {
     "dash-assert": "^1.0.2",
+    "eslint": "^1.7.3",
+    "eslint-config-4front": "^1.0.0",
     "istanbul": "^0.3.13",
     "mocha": "^2.2.1",
     "sinon": "^1.14.1"

@@ -27,7 +27,7 @@ describe('appRegistry', function() {
         del: sinon.spy(function(key) {
           delete self.cache[key];
         }),
-        setex: sinon.spy(function(key, value, ttl) {
+        setex: sinon.spy(function(key, value) {
           self.cache[key] = value;
         })
       },
@@ -128,7 +128,7 @@ describe('appRegistry', function() {
       var appName = 'appname';
       this.database.apps.push({appId: appId, name: appName});
 
-      this.registry.getByName(appName, function(err, app) {
+      this.registry.getByName(appName, function(err) {
         assert.ok(self.options.cache.get.calledWith('app_name_' + appName));
         assert.ok(self.options.database.getApplicationByName.calledWith(appName));
         assert.ok(self.options.cache.setex.calledWith('app_name_' + appName));
@@ -141,8 +141,8 @@ describe('appRegistry', function() {
 
   describe('batchGetById()', function() {
     it('some in cache, some not', function(done) {
-      this.database.apps.push({appId: '1', name:'app1'});
-      this.addToCache({appId: '2', name:'app2'});
+      this.database.apps.push({appId: '1', name: 'app1'});
+      this.addToCache({appId: '2', name: 'app2'});
 
       this.registry.batchGetById(['1', '2', '3'], function(err, apps) {
         assert.equal(apps.length, 2);
@@ -156,7 +156,7 @@ describe('appRegistry', function() {
 
   describe('getByDomain', function() {
     it('domain exists', function(done) {
-      this.addToCache({appId: '1', name:'app'});
+      this.addToCache({appId: '1', name: 'app'});
       this.database.domains.push({domain: 'www.app.com', appId: '1'});
 
       this.registry.getByDomain('www.app.com', function(err, app) {
@@ -190,41 +190,52 @@ describe('appRegistry', function() {
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'http://app.apphost.com');
         done();
-      })
+      });
     });
 
-    it('sets https app url', function(done) {
-      this.addToCache({appId: '1', name: 'app', requireSsl: true});
+    it('uses default virtual host if no custom domain with resolve action', function(done) {
+      var domain = {domain: 'www.app.com', action: 'redirect'};
+      this.addToCache({appId: '1', name: 'app', domains: [domain]});
 
       this.registry.getById('1', function(err, app) {
-        assert.equal(app.url, 'https://app.apphost.com');
-        done();
-      })
-    });
-
-    it('global ssl setting overrides app level setting', function(done) {
-      this.registry = appRegistry(_.extend(this.options, {
-        forceGlobalHttps: true
-      }));
-
-      var appId = '123';
-      this.addToCache({appId: appId, requireSsl: false});
-
-      this.registry.getById(appId, function(err, app) {
-        assert.isTrue(app.requireSsl);
-        assert.isTrue(/^https\:/.test(app.url));
-
+        assert.equal(app.url, 'http://app.apphost.com');
         done();
       });
     });
 
     it('sets custom domain app url', function(done) {
-      this.addToCache({appId: '1', name: 'app', domains: ['www.app.com'], requireSsl: true});
+      var domain = {domain: 'www.app.com', action: 'resolve', certificate: '24545'};
+      this.addToCache({appId: '1', name: 'app', domains: [domain]});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://www.app.com');
         done();
-      })
+      });
+    });
+
+    it('custom domain without a certificate is http', function(done) {
+      var domain = {domain: 'www.app.com', action: 'resolve'};
+      this.addToCache({appId: '1', name: 'app', domains: [domain]});
+
+      this.registry.getById('1', function(err, app) {
+        assert.equal(app.url, 'http://www.app.com');
+        done();
+      });
+    });
+
+    it('global ssl setting uses https', function(done) {
+      this.registry = appRegistry(_.extend({}, this.options, {
+        forceGlobalHttps: true
+      }));
+
+      var appId = '123';
+      this.addToCache({appId: appId});
+
+      this.registry.getById(appId, function(err, app) {
+        assert.isTrue(/^https\:/.test(app.url));
+
+        done();
+      });
     });
   });
 
@@ -232,7 +243,7 @@ describe('appRegistry', function() {
     beforeEach(function() {
       self = this;
 
-      this.registry = appRegistry(_.extend(this.options, {
+      this.registry = appRegistry(_.extend({}, this.options, {
         cacheEnabled: false
       }));
 
@@ -242,7 +253,7 @@ describe('appRegistry', function() {
     });
 
     it('getById', function(done) {
-      this.registry.getById(this.appId, function(err, app) {
+      this.registry.getById(this.appId, function(err) {
         if (err) return done(err);
 
         assert.isFalse(self.options.cache.get.called);
@@ -263,7 +274,7 @@ describe('appRegistry', function() {
     });
 
     it('getByName', function(done) {
-      this.registry.getByName(this.appName, function(err, app) {
+      this.registry.getByName(this.appName, function(err) {
         if (err) return done(err);
 
         assert.isFalse(self.options.cache.get.called);
