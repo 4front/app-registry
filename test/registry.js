@@ -156,11 +156,13 @@ describe('appRegistry', function() {
 
   describe('getByDomain', function() {
     it('domain exists', function(done) {
+      var domain = {domain: 'www.app.com', appId: '1'};
       this.addToCache({appId: '1', name: 'app'});
-      this.database.domains.push({domain: 'www.app.com', appId: '1'});
+      this.database.domains.push(domain);
 
       this.registry.getByDomain('www.app.com', function(err, app) {
         assert.equal(app.appId, '1');
+        assert.deepEqual(app.domain, domain);
         done();
       });
     });

@@ -119,16 +119,24 @@ module.exports = function(options) {
     }
 
     debug('get domain %s', domainName);
-    options.database.getDomain(domainName, function(err, domain) {
-      if (err) return callback(err);
+    async.waterfall([
+      function(cb) {
+        options.database.getDomain(domainName, cb);
+      },
+      function(domain, cb) {
+        if (!domain) {
+          debug('domain %s not found', domainName);
+          return cb(null, null);
+        }
 
-      if (!domain) {
-        debug('domain %s not found', domainName);
-        return callback(null, null);
+        exports.getById(domain.appId, opts, function(err, app) {
+          if (err) return cb(err);
+
+          app.domain = domain;
+          cb(null, app);
+        });
       }
-
-      exports.getById(domain.appId, opts, callback);
-    });
+    ], callback);
   };
 
   // Add the specified app to the registry.
