@@ -19,6 +19,7 @@ describe('appRegistry', function() {
 
     this.options = {
       cacheEnabled: true,
+      sslEnabled: true,
       virtualHost: 'apphost.com',
       cache: {
         get: sinon.spy(function(key, callback) {
@@ -182,7 +183,7 @@ describe('appRegistry', function() {
     };
 
     this.registry.add(app);
-    assert.equal(app.url, 'http://test.apphost.com');
+    assert.equal(app.url, 'https://test.apphost.com');
   });
 
   describe('fixUpApp', function() {
@@ -190,7 +191,7 @@ describe('appRegistry', function() {
       this.addToCache({appId: '1', name: 'app'});
 
       this.registry.getById('1', function(err, app) {
-        assert.equal(app.url, 'http://app.apphost.com');
+        assert.equal(app.url, 'https://app.apphost.com');
         done();
       });
     });
@@ -200,7 +201,7 @@ describe('appRegistry', function() {
       this.addToCache({appId: '1', name: 'app', domains: [domain]});
 
       this.registry.getById('1', function(err, app) {
-        assert.equal(app.url, 'http://app.apphost.com');
+        assert.equal(app.url, 'https://app.apphost.com');
         done();
       });
     });
@@ -295,5 +296,11 @@ describe('appRegistry', function() {
         done();
       });
     });
+  });
+
+  it('get env url', function() {
+    var virtualApp = {name: 'cool-app', url: 'https://cool-app.apphost.com'};
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'production'), 'https://cool-app.apphost.com');
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://cool-app--test.apphost.com');
   });
 });

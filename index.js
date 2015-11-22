@@ -2,8 +2,8 @@ var _ = require('lodash');
 var async = require('async');
 var debug = require('debug')('4front:app-registry');
 
-module.exports = function(options) {
-  options = _.defaults({}, options || {}, {
+module.exports = function(settings) {
+  settings = _.defaults({}, settings || {}, {
     cacheTtl: 5 * 60,
     cachePrefix: 'app_',
     useCustomDomains: true,
@@ -20,14 +20,14 @@ module.exports = function(options) {
       opts = {};
     }
 
-    if (opts.forceReload === true || options.cacheEnabled !== true) {
+    if (opts.forceReload === true || settings.cacheEnabled !== true) {
       return fetchFromDatabase(appId, callback);
     }
 
     debug('looking up app %s in cache', appId);
-    var appCacheKey = options.cachePrefix + appId;
+    var appCacheKey = settings.cachePrefix + appId;
 
-    options.cache.get(appCacheKey, function(err, appJson) {
+    settings.cache.get(appCacheKey, function(err, appJson) {
       if (err) return callback(err);
 
       var app;
@@ -72,8 +72,8 @@ module.exports = function(options) {
     }
 
     debug('looking up app with name: %s', name);
-    if (opts.forceReload === true || options.cacheEnabled !== true) {
-      options.database.getApplicationByName(name, function(err, app) {
+    if (opts.forceReload === true || settings.cacheEnabled !== true) {
+      settings.database.getApplicationByName(name, function(err, app) {
         if (err) return callback(err);
 
         if (!app) return callback(null, null);
@@ -83,19 +83,19 @@ module.exports = function(options) {
       });
     } else {
       // Lookup the app name in cache.
-      options.cache.get(options.cachePrefix + 'name_' + name, function(err, appId) {
+      settings.cache.get(settings.cachePrefix + 'name_' + name, function(err, appId) {
         if (err) return callback(err);
 
         if (appId) return exports.getById(appId, opts, callback);
 
         // If we didn't find the appName in cache, lookup the app by id.
-        options.database.getApplicationByName(name, function(_err, app) {
+        settings.database.getApplicationByName(name, function(_err, app) {
           if (_err) return callback(_err);
 
           if (app) {
             debug('found app in database with name: %s', name);
 
-            if (options.cacheEnabled === true) addToCache(app);
+            if (settings.cacheEnabled === true) addToCache(app);
 
             fixUpApp(app);
           }
@@ -108,8 +108,8 @@ module.exports = function(options) {
 
   // Flush app from the registry forcing it to reload from the database next time get is called.
   exports.flushApp = function(app) {
-    options.cache.del(options.cachePrefix + app.appId);
-    options.cache.del(options.cachePrefix + 'name_' + app.name);
+    settings.cache.del(settings.cachePrefix + app.appId);
+    settings.cache.del(settings.cachePrefix + 'name_' + app.name);
   };
 
   exports.getByDomain = function(domainName, opts, callback) {
@@ -121,7 +121,7 @@ module.exports = function(options) {
     debug('get domain %s', domainName);
     async.waterfall([
       function(cb) {
-        options.database.getDomain(domainName, cb);
+        settings.database.getDomain(domainName, cb);
       },
       function(domain, cb) {
         if (!domain) {
@@ -146,14 +146,24 @@ module.exports = function(options) {
     return app;
   };
 
+  // Build the virtual environment url for an app
+  exports.buildEnvUrl = function(virtualApp, envName) {
+    if (envName === 'production') {
+      return virtualApp.url;
+    }
+
+    return (settings.sslEnabled ? 'https' : 'http') + '://' + virtualApp.name + '--' + envName +
+      '.' + settings.virtualHost;
+  };
+
   function addToCache(app) {
     debug('writing app %s to cache', app.appId);
-    options.cache.setex(options.cachePrefix + app.appId, options.cacheTtl, JSON.stringify(app));
-    options.cache.setex(options.cachePrefix + 'name_' + app.name, options.cacheTtl, app.appId);
+    settings.cache.setex(settings.cachePrefix + app.appId, settings.cacheTtl, JSON.stringify(app));
+    settings.cache.setex(settings.cachePrefix + 'name_' + app.name, settings.cacheTtl, app.appId);
   }
 
   function fetchFromDatabase(appId, callback) {
-    options.database.getApplication(appId, function(err, app) {
+    settings.database.getApplication(appId, function(err, app) {
       if (err) return callback(err);
 
       if (!app) {
@@ -163,7 +173,7 @@ module.exports = function(options) {
       debug('found application %s in database', appId);
 
       // Store a mapping of appName to appId in cache
-      if (options.cacheEnabled === true) addToCache(app);
+      if (settings.cacheEnabled === true) addToCache(app);
 
       fixUpApp(app);
       callback(null, app);
@@ -184,18 +194,17 @@ module.exports = function(options) {
     var useHttps;
     var hostname;
 
-    if (options.useCustomDomains && _.isArray(app.domains) && app.domains.length) {
+    if (settings.useCustomDomains && _.isArray(app.domains) && app.domains.length) {
       // Find the first custom domain with a 'resolve' action.
       var domainToResolveTo = _.find(app.domains, {action: 'resolve'});
-      // debugger;
       if (domainToResolveTo) {
         useHttps = domainToResolveTo.certificate || false;
         hostname = domainToResolveTo.domain;
       }
     }
     if (!hostname) {
-      useHttps = options.forceGlobalHttps;
-      hostname = app.name + '.' + options.virtualHost;
+      useHttps = settings.sslEnabled;
+      hostname = app.name + '.' + settings.virtualHost;
     }
 
     app.url = (useHttps ? 'https://' : 'http://') + hostname;
