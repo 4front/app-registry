@@ -206,7 +206,9 @@ module.exports = function(settings) {
   function getCustomDomain(virtualApp) {
     if (_.isArray(virtualApp.domains) && virtualApp.domains.length > 0) {
       // Find the first custom domain with a 'resolve' action.
-      return _.find(virtualApp.domains, {action: 'resolve'});
+      return _.find(virtualApp.domains, function(domain) {
+        return domain.action === 'resolve' || _.isUndefined(domain.action);
+      });
     }
     return null;
   }
