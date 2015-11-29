@@ -149,12 +149,35 @@ module.exports = function(settings) {
   // Build the virtual environment url for an app
   exports.buildEnvUrl = function(virtualApp, envName) {
     if (envName === 'production') {
-      return virtualApp.url;
+      return buildProductionUrl(virtualApp);
     }
 
-    return (settings.sslEnabled ? 'https' : 'http') + '://' + virtualApp.name + '--' + envName +
-      '.' + settings.virtualHost;
+    // Support env urls for custom domains.
+    var customDomain = getCustomDomain(virtualApp);
+    if (customDomain) {
+      var domainParts = customDomain.domain.split('.');
+      if (domainParts.length >= 3) {
+        domainParts[0] = domainParts[0] + '--' + envName;
+        return buildUrl(_.isString(customDomain.certificate), domainParts);
+      }
+    }
+
+    return buildUrl(settings.sslEnabled, [virtualApp.name + '--' + envName, settings.virtualHost]);
   };
+
+  function buildProductionUrl(virtualApp) {
+    var customDomain = getCustomDomain(virtualApp);
+    if (customDomain) {
+      return buildUrl(_.isString(customDomain.certificate), [customDomain.domain]);
+    }
+    return buildUrl(settings.sslEnabled, [virtualApp.name, settings.virtualHost]);
+  }
+
+  function buildUrl(secure, parts) {
+    var url = (secure ? 'https' : 'http') + '://';
+    url += parts.join('.');
+    return url;
+  }
 
   function addToCache(app) {
     debug('writing app %s to cache', app.appId);
@@ -180,6 +203,14 @@ module.exports = function(settings) {
     });
   }
 
+  function getCustomDomain(virtualApp) {
+    if (_.isArray(virtualApp.domains) && virtualApp.domains.length > 0) {
+      // Find the first custom domain with a 'resolve' action.
+      return _.find(virtualApp.domains, {action: 'resolve'});
+    }
+    return null;
+  }
+
   function fixUpApp(app) {
     // TODO: Delete this when ready
     if (!app.trafficControlRules) app.trafficControlRules = [];
@@ -190,24 +221,7 @@ module.exports = function(settings) {
     // If the 4front environment specifies everything must be https, override
     // the app.requireSsl to true.
     if (!app.domains) app.domains = [];
-
-    var useHttps;
-    var hostname;
-
-    if (settings.useCustomDomains && _.isArray(app.domains) && app.domains.length) {
-      // Find the first custom domain with a 'resolve' action.
-      var domainToResolveTo = _.find(app.domains, {action: 'resolve'});
-      if (domainToResolveTo) {
-        useHttps = domainToResolveTo.certificate || false;
-        hostname = domainToResolveTo.domain;
-      }
-    }
-    if (!hostname) {
-      useHttps = settings.sslEnabled;
-      hostname = app.name + '.' + settings.virtualHost;
-    }
-
-    app.url = (useHttps ? 'https://' : 'http://') + hostname;
+    app.url = buildProductionUrl(app);
   }
 
   return exports;

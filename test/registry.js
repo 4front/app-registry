@@ -303,4 +303,22 @@ describe('appRegistry', function() {
     assert.equal(this.registry.buildEnvUrl(virtualApp, 'production'), 'https://cool-app.apphost.com');
     assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://cool-app--test.apphost.com');
   });
+
+  it('env url with custom domain', function() {
+    var domain = {
+      action: 'resolve',
+      domain: 'site.market.net',
+      certificate: 'asdfasdf'
+    };
+
+    var virtualApp = {name: 'cool-app', domains: [domain]};
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'production'), 'https://site.market.net');
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://site--test.market.net');
+
+    domain.certificate = null;
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'http://site--test.market.net');
+
+    domain.domain = 'market.net';
+    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://cool-app--test.apphost.com');
+  });
 });
