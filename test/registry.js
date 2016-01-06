@@ -2,6 +2,7 @@ var appRegistry = require('..');
 var assert = require('assert');
 var _ = require('lodash');
 var sinon = require('sinon');
+var shortid = require('shortid');
 
 require('dash-assert');
 
@@ -179,7 +180,8 @@ describe('appRegistry', function() {
   it('add to registry', function() {
     var app = {
       appId: '1',
-      name: 'test'
+      name: 'test',
+      requireSsl: true
     };
 
     this.registry.add(app);
@@ -207,8 +209,8 @@ describe('appRegistry', function() {
     });
 
     it('sets custom domain app url', function(done) {
-      var domain = {domain: 'www.app.com', action: 'resolve', certificate: '24545'};
-      this.addToCache({appId: '1', name: 'app', domains: [domain]});
+      var domain = {domain: 'www.app.com', action: 'resolve'};
+      this.addToCache({appId: '1', name: 'app', domains: [domain], requireSsl: true});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://www.app.com');
@@ -216,9 +218,9 @@ describe('appRegistry', function() {
       });
     });
 
-    it('custom domain without a certificate is http', function(done) {
+    it('custom domain when requireSsl is false is http', function(done) {
       var domain = {domain: 'www.app.com', action: 'resolve'};
-      this.addToCache({appId: '1', name: 'app', domains: [domain]});
+      this.addToCache({appId: '1', name: 'app', domains: [domain], requireSsl: false});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'http://www.app.com');
@@ -298,27 +300,48 @@ describe('appRegistry', function() {
     });
   });
 
-  it('get env url', function() {
-    var virtualApp = {name: 'cool-app', url: 'https://cool-app.apphost.com'};
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'production'), 'https://cool-app.apphost.com');
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://cool-app--test.apphost.com');
+  it('env specific urls', function(done) {
+    var environments = ['production', 'test', 'dev'];
+    var registry = appRegistry(_.extend(this.options, {
+      virtualEnvironments: function() {
+        return environments;
+      }
+    }));
+
+    var appId = shortid.generate();
+    this.database.apps.push({appId: appId, name: 'test-site', requireSsl: true});
+
+    registry.getById(appId, function(err, app) {
+      assert.noDifferences(_.keys(app.urls), environments);
+      assert.equal(app.urls.production, 'https://test-site.apphost.com');
+      assert.equal(app.urls.test, 'https://test-site--test.apphost.com');
+      assert.equal(app.urls.dev, 'https://test-site--dev.apphost.com');
+      done();
+    });
   });
 
-  it('env url with custom domain', function() {
+  it('env specific urls with custom domain', function(done) {
     var domain = {
       action: 'resolve',
-      domain: 'site.market.net',
-      certificate: 'asdfasdf'
+      domain: 'site.market.net'
     };
 
-    var virtualApp = {name: 'cool-app', domains: [domain]};
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'production'), 'https://site.market.net');
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://site--test.market.net');
+    var environments = ['production', 'test', 'dev'];
+    var registry = appRegistry(_.extend(this.options, {
+      virtualEnvironments: function() {
+        return environments;
+      }
+    }));
 
-    domain.certificate = null;
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'http://site--test.market.net');
+    var appId = shortid.generate();
+    this.database.apps.push({appId: appId, name: 'market', requireSsl: true, domains: [domain]});
 
-    domain.domain = 'market.net';
-    assert.equal(this.registry.buildEnvUrl(virtualApp, 'test'), 'https://cool-app--test.apphost.com');
+    registry.getById(appId, function(err, app) {
+      assert.noDifferences(_.keys(app.urls), environments);
+      assert.equal(app.urls.production, 'https://site.market.net');
+      assert.equal(app.urls.test, 'https://site--test.market.net');
+      assert.equal(app.urls.dev, 'https://site--dev.market.net');
+      done();
+    });
   });
 });

@@ -147,30 +147,26 @@ module.exports = function(settings) {
   };
 
   // Build the virtual environment url for an app
-  exports.buildEnvUrl = function(virtualApp, envName) {
-    if (envName === 'production') {
-      return buildProductionUrl(virtualApp);
-    }
-
+  function buildEnvUrl(virtualApp, customDomain, envName) {
     // Support env urls for custom domains.
-    var customDomain = getCustomDomain(virtualApp);
-    if (customDomain) {
+    if (_.isObject(customDomain)) {
+      if (envName === 'production') {
+        return buildUrl(virtualApp.requireSsl === true, [customDomain.domain]);
+      }
+
       var domainParts = customDomain.domain.split('.');
       if (domainParts.length >= 3) {
         domainParts[0] = domainParts[0] + '--' + envName;
-        return buildUrl(_.isString(customDomain.certificate), domainParts);
+        return buildUrl(virtualApp.requireSsl === true, domainParts);
       }
+    } else {
+      if (envName === 'production') {
+        return buildUrl(virtualApp.requireSsl, [virtualApp.name, settings.virtualHost]);
+      }
+      return buildUrl(virtualApp.requireSsl, [virtualApp.name + '--' + envName, settings.virtualHost]);
     }
 
-    return buildUrl(settings.sslEnabled, [virtualApp.name + '--' + envName, settings.virtualHost]);
-  };
-
-  function buildProductionUrl(virtualApp) {
-    var customDomain = getCustomDomain(virtualApp);
-    if (customDomain) {
-      return buildUrl(_.isString(customDomain.certificate), [customDomain.domain]);
-    }
-    return buildUrl(settings.sslEnabled, [virtualApp.name, settings.virtualHost]);
+    return buildUrl(virtualApp.requireSsl, [virtualApp.name + '--' + envName, settings.virtualHost]);
   }
 
   function buildUrl(secure, parts) {
@@ -214,16 +210,33 @@ module.exports = function(settings) {
   }
 
   function fixUpApp(app) {
-    // TODO: Delete this when ready
     if (!app.trafficControlRules) app.trafficControlRules = [];
 
-    // Temporary hack until personal apps are deprecated.
-    if (!app.orgId) app.environments = ['production'];
+    if (_.isFunction(settings.virtualEnvironments)) {
+      app.environments = _.union(['production'], settings.virtualEnvironments(app));
+    } else {
+      app.environments = ['production'];
+    }
 
-    // If the 4front environment specifies everything must be https, override
-    // the app.requireSsl to true.
-    if (!app.domains) app.domains = [];
-    app.url = buildProductionUrl(app);
+    if (_.isArray(app.domains) !== true) {
+      app.domains = [];
+    }
+
+    var customDomain = getCustomDomain(app);
+
+    // If sslEnabled is true and the app is not using a custom domain
+    // then force SSL
+    if (settings.sslEnabled === true && !_.isObject(customDomain)) {
+      app.requireSsl = true;
+    }
+
+    app.urls = {};
+    _.each(app.environments, function(envName) {
+      app.urls[envName] = buildEnvUrl(app, customDomain, envName);
+    });
+
+    // For convenience expose the production url on its own property
+    app.url = app.urls.production;
   }
 
   return exports;

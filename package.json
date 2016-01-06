@@ -33,6 +33,7 @@
     "eslint-config-4front": "^1.0.2",
     "istanbul": "^0.4.1",
     "mocha": "^2.3.4",
+    "shortid": "^2.2.4",
     "sinon": "^1.17.2"
   }
 }
