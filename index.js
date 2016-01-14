@@ -224,9 +224,11 @@ module.exports = function(settings) {
 
     var customDomain = getCustomDomain(app);
 
-    // If sslEnabled is true and the app is not using a custom domain
-    // then force SSL
-    if (settings.sslEnabled === true && !_.isObject(customDomain)) {
+    if (settings.forceGlobalHttps === true) {
+      app.requireSsl = true;
+    } else if (settings.sslEnabled === true && !_.isObject(customDomain)) {
+      // If sslEnabled is true and the app is not using a custom domain
+      // then force SSL
       app.requireSsl = true;
     }
 
