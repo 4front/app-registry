@@ -112,27 +112,63 @@ module.exports = function(settings) {
     settings.cache.del(settings.cachePrefix + 'name_' + app.name);
   };
 
-  exports.getByDomain = function(domainName, opts, callback) {
+  exports.getByDomain = function(fullDomainName, opts, callback) {
     if (_.isFunction(opts)) {
       callback = opts;
       opts = {};
     }
 
-    debug('get domain %s', domainName);
+    var domainNameParts = fullDomainName.split('.');
+    var domainName, subDomain;
+
+    // If this is an apex domain, then fullDomainName and the domainName are the same.
+    if (domainNameParts.length === 2) {
+      domainName = fullDomainName;
+      subDomain = null;
+    } else {
+      subDomain = domainNameParts[0];
+      domainName = domainNameParts.slice(1).join('.');
+    }
+    var appId;
+
+    debug('get domain %s', fullDomainName);
     async.waterfall([
+      // First try looking up the app using the new domainName and subDomain attributes
       function(cb) {
-        settings.database.getDomain(domainName, cb);
+        // Right now the new domainName requires a subDomain, so if there is no subDomain
+        // it must be a legacy domain.
+        if (!subDomain) return cb();
+
+        settings.database.getAppIdByDomainName(domainName, subDomain, function(err, _appId) {
+          if (err) return cb(err);
+          appId = _appId;
+          cb();
+        });
       },
-      function(domain, cb) {
-        if (!domain) {
+      function(cb) {
+        if (appId) return cb();
+        settings.database.getLegacyDomain(fullDomainName, function(err, legacyDomain) {
+          if (err) return cb(err);
+          if (legacyDomain) {
+            appId = legacyDomain.appId;
+          }
+          cb();
+        });
+      },
+      function(cb) {
+        if (!appId) {
           debug('domain %s not found', domainName);
           return cb(null, null);
         }
 
-        exports.getById(domain.appId, opts, function(err, app) {
+        exports.getById(appId, opts, function(err, app) {
           if (err) return cb(err);
 
-          app.domain = domain;
+          if (app && !app.domainName) {
+            app.domainName = domainName;
+            app.subDomain = subDomain;
+          }
+
           cb(null, app);
         });
       }

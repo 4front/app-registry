@@ -18,7 +18,7 @@ describe('appRegistry', function() {
       domains: []
     };
 
-    this.options = {
+    this.settings = {
       cacheEnabled: true,
       sslEnabled: true,
       virtualHost: 'apphost.com',
@@ -40,17 +40,17 @@ describe('appRegistry', function() {
         getApplicationByName: sinon.spy(function(name, callback) {
           callback(null, _.find(self.database.apps, {name: name}));
         }),
-        getDomain: sinon.spy(function(domain, callback) {
+        getLegacyDomain: sinon.spy(function(domain, callback) {
           callback(null, _.find(self.database.domains, {domain: domain}));
         })
       }
     };
 
-    this.registry = appRegistry(this.options);
+    this.registry = appRegistry(this.settings);
 
     this.addToCache = function(app) {
-      self.options.cache.setex('app_' + app.appId, JSON.stringify(app));
-      self.options.cache.setex('app_name_' + app.name, app.appId);
+      self.settings.cache.setex('app_' + app.appId, JSON.stringify(app));
+      self.settings.cache.setex('app_name_' + app.name, app.appId);
     };
   });
 
@@ -62,7 +62,7 @@ describe('appRegistry', function() {
       this.registry.getById(appId, function(err, app) {
         if (err) return done(err);
 
-        assert.ok(self.options.cache.get.calledWith('app_' + appId));
+        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
         assert.equal(appId, app.appId);
         done();
       });
@@ -76,10 +76,10 @@ describe('appRegistry', function() {
       this.registry.getById(appId, function(err, app) {
         if (err) return done(err);
 
-        assert.ok(self.options.cache.get.calledWith('app_' + appId));
-        assert.ok(self.options.database.getApplication.calledWith(appId));
-        assert.ok(self.options.cache.setex.calledWith('app_' + appId));
-        assert.ok(self.options.cache.setex.calledWith('app_name_' + appName));
+        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
+        assert.ok(self.settings.database.getApplication.calledWith(appId));
+        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
+        assert.ok(self.settings.cache.setex.calledWith('app_name_' + appName));
         assert.equal(appId, app.appId);
         done();
       });
@@ -88,8 +88,8 @@ describe('appRegistry', function() {
     it('app not in cache and not in database', function(done) {
       var appId = '123';
       this.registry.getById(appId, function(err, app) {
-        assert.ok(self.options.cache.get.calledWith('app_' + appId));
-        assert.ok(self.options.database.getApplication.calledWith(appId));
+        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
+        assert.ok(self.settings.database.getApplication.calledWith(appId));
         assert.ok(_.isNull(app));
         done();
       });
@@ -101,9 +101,9 @@ describe('appRegistry', function() {
       this.database.apps.push({appId: appId, name: 'appname'});
 
       this.registry.getById(appId, {forceReload: true}, function(err, app) {
-        assert.equal(self.options.cache.get.called, false);
-        assert.ok(self.options.database.getApplication.calledWith(appId));
-        assert.ok(self.options.cache.setex.calledWith('app_' + appId));
+        assert.equal(self.settings.cache.get.called, false);
+        assert.ok(self.settings.database.getApplication.calledWith(appId));
+        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
         assert.equal(appId, app.appId);
         done();
       });
@@ -117,8 +117,8 @@ describe('appRegistry', function() {
       this.addToCache({appId: appId, name: appName});
 
       this.registry.getByName(appName, function(err, app) {
-        assert.ok(self.options.cache.get.calledWith('app_name_' + appName));
-        assert.ok(self.options.cache.get.calledWith('app_' + appId));
+        assert.ok(self.settings.cache.get.calledWith('app_name_' + appName));
+        assert.ok(self.settings.cache.get.calledWith('app_' + appId));
 
         assert.equal(appId, app.appId);
         done();
@@ -131,10 +131,10 @@ describe('appRegistry', function() {
       this.database.apps.push({appId: appId, name: appName});
 
       this.registry.getByName(appName, function(err) {
-        assert.ok(self.options.cache.get.calledWith('app_name_' + appName));
-        assert.ok(self.options.database.getApplicationByName.calledWith(appName));
-        assert.ok(self.options.cache.setex.calledWith('app_name_' + appName));
-        assert.ok(self.options.cache.setex.calledWith('app_' + appId));
+        assert.ok(self.settings.cache.get.calledWith('app_name_' + appName));
+        assert.ok(self.settings.database.getApplicationByName.calledWith(appName));
+        assert.ok(self.settings.cache.setex.calledWith('app_name_' + appName));
+        assert.ok(self.settings.cache.setex.calledWith('app_' + appId));
 
         done();
       });
@@ -148,30 +148,74 @@ describe('appRegistry', function() {
 
       this.registry.batchGetById(['1', '2', '3'], function(err, apps) {
         assert.equal(apps.length, 2);
-        assert.ok(self.options.database.getApplication.calledWith('1'));
-        assert.ok(self.options.database.getApplication.calledWith('3'));
-        assert.ok(self.options.cache.setex.calledWith('app_1'));
+        assert.ok(self.settings.database.getApplication.calledWith('1'));
+        assert.ok(self.settings.database.getApplication.calledWith('3'));
+        assert.ok(self.settings.cache.setex.calledWith('app_1'));
         done();
       });
     });
   });
 
   describe('getByDomain', function() {
-    it('domain exists', function(done) {
-      var domain = {domain: 'www.app.com', appId: '1'};
-      this.addToCache({appId: '1', name: 'app'});
-      this.database.domains.push(domain);
+    beforeEach(function() {
+      self = this;
+      this.appId = shortid.generate();
+      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
+        callback(null, self.appId);
+      });
 
+      this.addToCache({appId: this.appId});
+
+      this.settings.database.getLegacyDomain = sinon.spy(function(fullDomainName, callback) {
+        callback(null, {domain: fullDomainName, appId: self.appId});
+      });
+    });
+
+    it('new style domain exists', function(done) {
       this.registry.getByDomain('www.app.com', function(err, app) {
-        assert.equal(app.appId, '1');
-        assert.deepEqual(app.domain, domain);
+        if (err) return done(err);
+        assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
+        assert.isFalse(self.settings.database.getLegacyDomain.called);
+        assert.equal(app.appId, self.appId);
         done();
       });
     });
 
-    it('domain not exists', function(done) {
-      this.registry.getByDomain('www.missing.com', function(err, app) {
-        assert.ok(_.isNull(app));
+    it('new style domain does not exist', function(done) {
+      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
+        callback(null, null);
+      });
+
+      this.registry.getByDomain('www.app.com', function(err, app) {
+        assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
+        assert.isTrue(self.settings.database.getLegacyDomain.calledWith('www.app.com'));
+        assert.equal(app.appId, self.appId);
+        done();
+      });
+    });
+
+    it('apex domain does not check for new style domain', function(done) {
+      this.registry.getByDomain('app.com', function(err, app) {
+        assert.isFalse(self.settings.database.getAppIdByDomainName.called);
+        assert.isTrue(self.settings.database.getLegacyDomain.calledWith('app.com'));
+        assert.equal(app.appId, self.appId);
+        done();
+      });
+    });
+
+    it('no matching new style or legacy domain', function(done) {
+      this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
+        callback(null, null);
+      });
+
+      this.settings.database.getLegacyDomain = sinon.spy(function(fullDomainName, callback) {
+        callback(null, null);
+      });
+
+      this.registry.getByDomain('www.app.com', function(err, app) {
+        assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
+        assert.isTrue(self.settings.database.getLegacyDomain.calledWith('www.app.com'));
+        assert.isNull(app);
         done();
       });
     });
@@ -229,7 +273,7 @@ describe('appRegistry', function() {
     });
 
     it('global ssl setting uses https', function(done) {
-      this.registry = appRegistry(_.extend({}, this.options, {
+      this.registry = appRegistry(_.extend({}, this.settings, {
         forceGlobalHttps: true
       }));
 
@@ -248,7 +292,7 @@ describe('appRegistry', function() {
     beforeEach(function() {
       self = this;
 
-      this.registry = appRegistry(_.extend({}, this.options, {
+      this.registry = appRegistry(_.extend({}, this.settings, {
         cacheEnabled: false
       }));
 
@@ -261,9 +305,9 @@ describe('appRegistry', function() {
       this.registry.getById(this.appId, function(err) {
         if (err) return done(err);
 
-        assert.isFalse(self.options.cache.get.called);
-        assert.isFalse(self.options.cache.setex.called);
-        assert.isTrue(self.options.database.getApplication.calledWith(self.appId));
+        assert.isFalse(self.settings.cache.get.called);
+        assert.isFalse(self.settings.cache.setex.called);
+        assert.isTrue(self.settings.database.getApplication.calledWith(self.appId));
 
         done();
       });
@@ -282,9 +326,9 @@ describe('appRegistry', function() {
       this.registry.getByName(this.appName, function(err) {
         if (err) return done(err);
 
-        assert.isFalse(self.options.cache.get.called);
-        assert.isFalse(self.options.cache.setex.called);
-        assert.isTrue(self.options.database.getApplicationByName.calledWith(self.appName));
+        assert.isFalse(self.settings.cache.get.called);
+        assert.isFalse(self.settings.cache.setex.called);
+        assert.isTrue(self.settings.database.getApplicationByName.calledWith(self.appName));
 
         done();
       });
@@ -302,7 +346,7 @@ describe('appRegistry', function() {
 
   it('env specific urls', function(done) {
     var environments = ['production', 'test', 'dev'];
-    var registry = appRegistry(_.extend(this.options, {
+    var registry = appRegistry(_.extend(this.settings, {
       virtualEnvironments: function() {
         return environments;
       }
@@ -327,7 +371,7 @@ describe('appRegistry', function() {
     };
 
     var environments = ['production', 'test', 'dev'];
-    var registry = appRegistry(_.extend(this.options, {
+    var registry = appRegistry(_.extend(this.settings, {
       virtualEnvironments: function() {
         return environments;
       }
