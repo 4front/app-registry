@@ -234,7 +234,7 @@ describe('appRegistry', function() {
 
   describe('fixUpApp', function() {
     it('sets http app url', function(done) {
-      this.addToCache({appId: '1', name: 'app'});
+      this.addToCache({appId: '1', name: 'app', requireSsl: true});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://app.apphost.com');
@@ -247,7 +247,7 @@ describe('appRegistry', function() {
       this.addToCache({appId: '1', name: 'app', domains: [domain]});
 
       this.registry.getById('1', function(err, app) {
-        assert.equal(app.url, 'https://app.apphost.com');
+        assert.equal(app.url, 'http://app.apphost.com');
         done();
       });
     });
