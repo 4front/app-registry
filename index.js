@@ -1,5 +1,6 @@
 var _ = require('lodash');
 var async = require('async');
+var publicSuffixList = require('psl');
 var debug = require('debug')('4front:app-registry');
 
 module.exports = function(settings) {
@@ -118,17 +119,11 @@ module.exports = function(settings) {
       opts = {};
     }
 
-    var domainNameParts = fullDomainName.split('.');
-    var domainName, subDomain;
+    var parsedDomain = publicSuffixList.parse(fullDomainName);
+    var domainName = parsedDomain.domain;
+    var subDomain = parsedDomain.subdomain;
+    if (_.isEmpty(subDomain)) subDomain = '@';
 
-    // If this is an apex domain, then fullDomainName and the domainName are the same.
-    if (domainNameParts.length === 2) {
-      domainName = fullDomainName;
-      subDomain = null;
-    } else {
-      subDomain = domainNameParts[0];
-      domainName = domainNameParts.slice(1).join('.');
-    }
     var appId;
 
     debug('get domain %s', fullDomainName);

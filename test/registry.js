@@ -194,15 +194,6 @@ describe('appRegistry', function() {
       });
     });
 
-    it('apex domain does not check for new style domain', function(done) {
-      this.registry.getByDomain('app.com', function(err, app) {
-        assert.isFalse(self.settings.database.getAppIdByDomainName.called);
-        assert.isTrue(self.settings.database.getLegacyDomain.calledWith('app.com'));
-        assert.equal(app.appId, self.appId);
-        done();
-      });
-    });
-
     it('no matching new style or legacy domain', function(done) {
       this.settings.database.getAppIdByDomainName = sinon.spy(function(domainName, subDomain, callback) {
         callback(null, null);
