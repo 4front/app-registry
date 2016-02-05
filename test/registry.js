@@ -243,9 +243,14 @@ describe('appRegistry', function() {
       });
     });
 
-    it('sets custom domain app url', function(done) {
+    it('sets legacy custom domain app url', function(done) {
       var domain = {domain: 'www.app.com', action: 'resolve'};
-      this.addToCache({appId: '1', name: 'app', domains: [domain], requireSsl: true});
+      this.addToCache({
+        appId: '1',
+        name: 'app',
+        legacyDomains: [domain],
+        requireSsl: true
+      });
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'https://www.app.com');
@@ -255,7 +260,7 @@ describe('appRegistry', function() {
 
     it('custom domain when requireSsl is false is http', function(done) {
       var domain = {domain: 'www.app.com', action: 'resolve'};
-      this.addToCache({appId: '1', name: 'app', domains: [domain], requireSsl: false});
+      this.addToCache({appId: '1', name: 'app', legacyDomains: [domain], requireSsl: false});
 
       this.registry.getById('1', function(err, app) {
         assert.equal(app.url, 'http://www.app.com');
@@ -274,6 +279,39 @@ describe('appRegistry', function() {
       this.registry.getById(appId, function(err, app) {
         assert.isTrue(/^https\:/.test(app.url));
 
+        done();
+      });
+    });
+  });
+
+  describe('custom domain urls', function() {
+    beforeEach(function() {
+      self = this;
+      this.registry = appRegistry(_.extend(this.settings, {
+        virtualEnvironments: function() {
+          return ['production', 'test', 'dev'];
+        }
+      }));
+    });
+
+    it('domainName and subDomain', function(done) {
+      this.addToCache({appId: '1', domainName: 'foo.com', subDomain: 'www'});
+
+      this.registry.getById('1', function(err, app) {
+        assert.equal(app.url, 'https://www.foo.com');
+        assert.equal(app.urls.test, 'https://www--test.foo.com');
+        assert.equal(app.urls.dev, 'https://www--dev.foo.com');
+        done();
+      });
+    });
+
+    it('apex domainName', function(done) {
+      this.addToCache({appId: '1', domainName: 'foo.com', subDomain: '@'});
+
+      this.registry.getById('1', function(err, app) {
+        assert.equal(app.url, 'https://foo.com');
+        assert.equal(app.urls.test, 'https://test.foo.com');
+        assert.equal(app.urls.dev, 'https://dev.foo.com');
         done();
       });
     });
@@ -355,7 +393,7 @@ describe('appRegistry', function() {
     });
   });
 
-  it('env specific urls with custom domain', function(done) {
+  it('env specific urls with legacy custom domain', function(done) {
     var domain = {
       action: 'resolve',
       domain: 'site.market.net'
@@ -369,7 +407,12 @@ describe('appRegistry', function() {
     }));
 
     var appId = shortid.generate();
-    this.database.apps.push({appId: appId, name: 'market', requireSsl: true, domains: [domain]});
+    this.database.apps.push({
+      appId: appId,
+      name: 'market',
+      requireSsl: true,
+      legacyDomains: [domain]
+    });
 
     registry.getById(appId, function(err, app) {
       assert.noDifferences(_.keys(app.urls), environments);

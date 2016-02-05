@@ -121,8 +121,7 @@ module.exports = function(settings) {
 
     var parsedDomain = publicSuffixList.parse(fullDomainName);
     var domainName = parsedDomain.domain;
-    var subDomain = parsedDomain.subdomain;
-    if (_.isEmpty(subDomain)) subDomain = '@';
+    var subDomain = parsedDomain.subdomain || '@';
 
     var appId;
 
@@ -177,35 +176,6 @@ module.exports = function(settings) {
     return app;
   };
 
-  // Build the virtual environment url for an app
-  function buildEnvUrl(virtualApp, customDomain, envName) {
-    // Support env urls for custom domains.
-    if (_.isObject(customDomain)) {
-      if (envName === 'production') {
-        return buildUrl(virtualApp.requireSsl === true, [customDomain.domain]);
-      }
-
-      var domainParts = customDomain.domain.split('.');
-      if (domainParts.length >= 3) {
-        domainParts[0] = domainParts[0] + '--' + envName;
-        return buildUrl(virtualApp.requireSsl === true, domainParts);
-      }
-    } else {
-      if (envName === 'production') {
-        return buildUrl(virtualApp.requireSsl, [virtualApp.name, settings.virtualHost]);
-      }
-      return buildUrl(virtualApp.requireSsl, [virtualApp.name + '--' + envName, settings.virtualHost]);
-    }
-
-    return buildUrl(virtualApp.requireSsl, [virtualApp.name + '--' + envName, settings.virtualHost]);
-  }
-
-  function buildUrl(secure, parts) {
-    var url = (secure ? 'https' : 'http') + '://';
-    url += parts.join('.');
-    return url;
-  }
-
   function addToCache(app) {
     debug('writing app %s to cache', app.appId);
     settings.cache.setex(settings.cachePrefix + app.appId, settings.cacheTtl, JSON.stringify(app));
@@ -230,14 +200,35 @@ module.exports = function(settings) {
     });
   }
 
-  function getCustomDomain(virtualApp) {
-    if (_.isArray(virtualApp.domains) && virtualApp.domains.length > 0) {
+  function getLegacyCustomDomain(virtualApp) {
+    if (_.isArray(virtualApp.legacyDomains) && virtualApp.legacyDomains.length > 0) {
       // Find the first custom domain with a 'resolve' action.
-      return _.find(virtualApp.domains, function(domain) {
+      return _.find(virtualApp.legacyDomains, function(domain) {
         return domain.action === 'resolve' || _.isUndefined(domain.action);
       });
     }
     return null;
+  }
+
+  function buildUrl(domainName, subDomain, useSsl, envName) {
+    // All custom domain URLs are SSL
+    var url = 'http' + (useSsl ? 's' : '') + '://';
+
+    // If the subDomain is '@' then this is the apex domain
+    if (subDomain === '@') {
+      if (envName === 'production') {
+        url += domainName;
+      } else {
+        url += envName + '.' + domainName;
+      }
+    } else {
+      if (envName === 'production') {
+        url += subDomain + '.' + domainName;
+      } else {
+        url += subDomain + '--' + envName + '.' + domainName;
+      }
+    }
+    return url;
   }
 
   function fixUpApp(app) {
@@ -249,19 +240,33 @@ module.exports = function(settings) {
       app.environments = ['production'];
     }
 
-    if (_.isArray(app.domains) !== true) {
-      app.domains = [];
-    }
-
-    var customDomain = getCustomDomain(app);
-
     if (settings.forceGlobalHttps === true) {
       app.requireSsl = true;
     }
 
+    var domainName, subDomain, useSsl;
+
+    // If the app has a domainName property, then it's using a new custom domain
+    if (!_.isEmpty(app.domainName)) {
+      domainName = app.domainName;
+      subDomain = app.subDomain;
+      useSsl = true;
+    } else {
+      var legacyDomain = getLegacyCustomDomain(app);
+      useSsl = app.requireSsl === true;
+      if (legacyDomain) {
+        var parsedDomain = publicSuffixList.parse(legacyDomain.domain);
+        domainName = parsedDomain.domain;
+        subDomain = parsedDomain.subdomain || '@';
+      } else {
+        domainName = settings.virtualHost;
+        subDomain = app.name;
+      }
+    }
+
     app.urls = {};
     _.each(app.environments, function(envName) {
-      app.urls[envName] = buildEnvUrl(app, customDomain, envName);
+      app.urls[envName] = buildUrl(domainName, subDomain, useSsl, envName);
     });
 
     // For convenience expose the production url on its own property
