@@ -113,26 +113,19 @@ module.exports = function(settings) {
     settings.cache.del(settings.cachePrefix + 'name_' + app.name);
   };
 
-  exports.getByDomain = function(fullDomainName, opts, callback) {
+  exports.getByDomain = function(domainName, subDomain, opts, callback) {
     if (_.isFunction(opts)) {
       callback = opts;
       opts = {};
     }
 
-    var parsedDomain = publicSuffixList.parse(fullDomainName);
-    var domainName = parsedDomain.domain;
-    var subDomain = parsedDomain.subdomain || '@';
-
     var appId;
 
-    debug('get domain %s', fullDomainName);
+    debug('get app for domain=%s, subdomain=%s', domainName, subDomain);
     async.waterfall([
       // First try looking up the app using the new domainName and subDomain attributes
       function(cb) {
-        // Right now the new domainName requires a subDomain, so if there is no subDomain
-        // it must be a legacy domain.
-        if (!subDomain) return cb();
-
+        // First look up the app by domain name.
         settings.database.getAppIdByDomainName(domainName, subDomain, function(err, _appId) {
           if (err) return cb(err);
           appId = _appId;
@@ -141,6 +134,7 @@ module.exports = function(settings) {
       },
       function(cb) {
         if (appId) return cb();
+        var fullDomainName = subDomain === '@' ? domainName : subDomain + '.' + domainName;
         settings.database.getLegacyDomain(fullDomainName, function(err, legacyDomain) {
           if (err) return cb(err);
           if (legacyDomain) {

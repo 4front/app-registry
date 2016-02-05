@@ -172,9 +172,9 @@ describe('appRegistry', function() {
     });
 
     it('new style domain exists', function(done) {
-      this.registry.getByDomain('www.app.com', function(err, app) {
+      this.registry.getByDomain('app.com', '@', function(err, app) {
         if (err) return done(err);
-        assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
+        assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', '@'));
         assert.isFalse(self.settings.database.getLegacyDomain.called);
         assert.equal(app.appId, self.appId);
         done();
@@ -186,7 +186,7 @@ describe('appRegistry', function() {
         callback(null, null);
       });
 
-      this.registry.getByDomain('www.app.com', function(err, app) {
+      this.registry.getByDomain('app.com', 'www', function(err, app) {
         assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
         assert.isTrue(self.settings.database.getLegacyDomain.calledWith('www.app.com'));
         assert.equal(app.appId, self.appId);
@@ -203,7 +203,7 @@ describe('appRegistry', function() {
         callback(null, null);
       });
 
-      this.registry.getByDomain('www.app.com', function(err, app) {
+      this.registry.getByDomain('app.com', 'www', function(err, app) {
         assert.isTrue(self.settings.database.getAppIdByDomainName.calledWith('app.com', 'www'));
         assert.isTrue(self.settings.database.getLegacyDomain.calledWith('www.app.com'));
         assert.isNull(app);
