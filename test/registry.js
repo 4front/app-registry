@@ -288,8 +288,8 @@ describe('appRegistry', function() {
     beforeEach(function() {
       self = this;
       this.registry = appRegistry(_.extend(this.settings, {
-        virtualEnvironments: function() {
-          return ['production', 'test', 'dev'];
+        visitApp: function(virtualApp) {
+          virtualApp.environments = ['production', 'test', 'dev'];
         }
       }));
     });
@@ -376,8 +376,8 @@ describe('appRegistry', function() {
   it('env specific urls', function(done) {
     var environments = ['production', 'test', 'dev'];
     var registry = appRegistry(_.extend(this.settings, {
-      virtualEnvironments: function() {
-        return environments;
+      visitApp: function(virtualApp) {
+        virtualApp.environments = environments;
       }
     }));
 
@@ -401,8 +401,8 @@ describe('appRegistry', function() {
 
     var environments = ['production', 'test', 'dev'];
     var registry = appRegistry(_.extend(this.settings, {
-      virtualEnvironments: function() {
-        return environments;
+      visitApp: function(virtualApp) {
+        virtualApp.environments = environments;
       }
     }));
 

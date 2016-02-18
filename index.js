@@ -228,8 +228,12 @@ module.exports = function(settings) {
   function fixUpApp(app) {
     if (!app.trafficControlRules) app.trafficControlRules = [];
 
-    if (_.isFunction(settings.virtualEnvironments)) {
-      app.environments = _.union(['production'], settings.virtualEnvironments(app));
+    if (_.isFunction(settings.visitApp)) {
+      settings.visitApp(app);
+    }
+
+    if (_.isArray(app.environments)) {
+      app.environments = _.union(['production'], app.environments);
     } else {
       app.environments = ['production'];
     }
