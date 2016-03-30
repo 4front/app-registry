@@ -9,6 +9,7 @@ module.exports = function(settings) {
     cachePrefix: 'app_',
     useCustomDomains: true,
     forceGlobalHttps: false,
+    sharedDomainHttps: true,
     cacheEnabled: process.env.FF_APP_CACHE_ENABLED === '1'
   });
 
@@ -251,14 +252,15 @@ module.exports = function(settings) {
       useSsl = true;
     } else {
       var legacyDomain = getLegacyCustomDomain(app);
-      useSsl = app.requireSsl === true;
       if (legacyDomain) {
         var parsedDomain = publicSuffixList.parse(legacyDomain.domain);
         domainName = parsedDomain.domain;
         subDomain = parsedDomain.subdomain || '@';
+        useSsl = app.requireSsl === true;
       } else {
         domainName = settings.virtualHost;
         subDomain = app.name;
+        useSsl = settings.sharedDomainHttps;
       }
     }
 
